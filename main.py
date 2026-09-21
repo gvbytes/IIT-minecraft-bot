@@ -374,6 +374,176 @@ class TicketLauncher(discord.ui.View):
 
 
 # ==============================================================================
+# DISCORD COMMANDS (SLASH & PREFIX)
+# ==============================================================================
+
+@bot.tree.command(name="help", description="Show all IITK Minecraft server features and bot commands")
+async def cmd_slash_help(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🏰 IITK Minecraft Server Guide & Commands",
+        description="Welcome! Here is everything you can do with the bot and the server:",
+        color=discord.Color.from_rgb(33, 150, 243)
+    )
+    embed.add_field(
+        name="📌 Getting Started",
+        value=(
+            "• **Pick Roles:** Go to <#pick-your-roles> to choose your Hall/Hostel, Java/Bedrock edition, and notifications.\n"
+            "• **Whitelist Access:** Head to <#whitelist-requests> and click `[📝 Apply for Whitelist]`.\n"
+            "• **Need Help / Grief Report:** Open a private ticket in <#create-a-ticket>."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="⚡ Bot Commands",
+        value=(
+            "• `/ip` or `!iitk ip` — Get the current server IP, port, and connection manual.\n"
+            "• `/coords` or `!iitk coords` — View community coordinates (Spawn, Nether Hub, End Portal).\n"
+            "• `/rules` or `!iitk rules` — Quick recap of server guidelines & anti-grief policy.\n"
+            "• `/ping` or `!iitk ping` — Check bot response latency.\n"
+            "• `/help` or `!iitk help` — Show this help manual."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🛡️ Staff Commands",
+        value="• `/whitelist_add <user> <ign>` — Instantly approve & whitelist a member (Staff only).",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.command(name="help")
+async def cmd_text_help(ctx):
+    embed = discord.Embed(
+        title="🏰 IITK Minecraft Server Guide & Commands",
+        description="Here is everything you can do with the bot and the server:",
+        color=discord.Color.from_rgb(33, 150, 243)
+    )
+    embed.add_field(
+        name="📌 Getting Started",
+        value=(
+            "• **Pick Roles:** Head to `#pick-your-roles` to choose your Hall and platform.\n"
+            "• **Whitelist:** Go to `#whitelist-requests` and click `[📝 Apply for Whitelist]`.\n"
+            "• **Support:** Open a ticket in `#create-a-ticket`."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="⚡ Available Commands",
+        value=(
+            "• `!iitk ip` or `/ip` — Server address and ports\n"
+            "• `!iitk coords` or `/coords` — Key points of interest\n"
+            "• `!iitk rules` or `/rules` — Server rules recap\n"
+            "• `!iitk ping` or `/ping` — Check bot latency\n"
+            "• `!iitk help` or `/help` — This help menu"
+        ),
+        inline=False
+    )
+    await ctx.send(embed=embed)
+
+
+@bot.tree.command(name="ip", description="Get the server address, ports, and connection guide")
+async def cmd_slash_ip(interaction: discord.Interaction):
+    ip_display = SERVER_IP if SERVER_IP else "Campus LAN IP (172.x.x.x) or Playit Tunnel"
+    embed = discord.Embed(
+        title="🌐 IITK Minecraft Connection Info",
+        color=discord.Color.from_rgb(46, 204, 113)
+    )
+    embed.add_field(name="💻 Java Edition", value=f"Address: `{ip_display}`\nPort: `25565`\nVersion: `1.20.x / 1.21.x`", inline=False)
+    embed.add_field(name="📱 Bedrock / PE", value=f"Address: `{ip_display}`\nPort: `19132`", inline=False)
+    embed.add_field(name="🏫 Campus Note", value="Works directly on hostel Wi-Fi/LAN. Check <#announcements> for remote tunnels.", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.command(name="ip")
+async def cmd_text_ip(ctx):
+    ip_display = SERVER_IP if SERVER_IP else "Campus LAN IP (172.x.x.x) or Playit Tunnel"
+    embed = discord.Embed(
+        title="🌐 IITK Minecraft Connection Info",
+        color=discord.Color.from_rgb(46, 204, 113)
+    )
+    embed.add_field(name="💻 Java Edition", value=f"Address: `{ip_display}`\nPort: `25565`\nVersion: `1.20.x / 1.21.x`", inline=False)
+    embed.add_field(name="📱 Bedrock / PE", value=f"Address: `{ip_display}`\nPort: `19132`", inline=False)
+    await ctx.send(embed=embed)
+
+
+@bot.tree.command(name="coords", description="View key community locations and coordinates")
+async def cmd_slash_coords(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🗺️ Community Points of Interest",
+        description="Coordinates for key landmarks across the world:",
+        color=discord.Color.from_rgb(241, 196, 15)
+    )
+    embed.add_field(name="🏛️ World Spawn", value="`X: 0, Y: 70, Z: 0`", inline=True)
+    embed.add_field(name="🚇 Nether Hub", value="`X: 0, Y: 120, Z: 0` *(Nether)*", inline=True)
+    embed.add_field(name="💰 Marketplace", value="Check <#campus-marketplace>", inline=True)
+    embed.add_field(name="🐉 End Portal", value="Check <#dynmap-and-coords>", inline=True)
+    embed.add_field(name="🏰 Hall Settlements", value="Declared in <#hall-factions>", inline=True)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.command(name="coords")
+async def cmd_text_coords(ctx):
+    embed = discord.Embed(
+        title="🗺️ Community Points of Interest",
+        color=discord.Color.from_rgb(241, 196, 15)
+    )
+    embed.add_field(name="🏛️ World Spawn", value="`X: 0, Y: 70, Z: 0`", inline=True)
+    embed.add_field(name="🚇 Nether Hub", value="`X: 0, Y: 120, Z: 0` *(Nether)*", inline=True)
+    embed.add_field(name="💰 Marketplace", value="Check `#campus-marketplace`", inline=True)
+    await ctx.send(embed=embed)
+
+
+@bot.tree.command(name="rules", description="Quick overview of server rules & anti-grief policy")
+async def cmd_slash_rules(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📜 Server Rules & Guidelines Summary",
+        description="1. **No Griefing / Stealing:** CoreProtect is active and logs all block & chest edits.\n2. **No Unfair Advantages:** No X-Ray, baritone, or hacked clients.\n3. **Campus Honor Code:** Respect fellow students in chat and voice.\n4. **Farms:** Keep farms lag-friendly with an off-switch.\n\nFull details in <#rules-and-conduct>.",
+        color=discord.Color.from_rgb(33, 150, 243)
+    )
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.command(name="rules")
+async def cmd_text_rules(ctx):
+    await ctx.send("📜 Check out `#rules-and-conduct` for the complete rules and anti-grief policy!")
+
+
+@bot.tree.command(name="ping", description="Check bot latency")
+async def cmd_slash_ping(interaction: discord.Interaction):
+    latency = round(bot.latency * 1000)
+    await interaction.response.send_message(f"🏓 Pong! Latency: `{latency}ms`")
+
+
+@bot.command(name="ping")
+async def cmd_text_ping(ctx):
+    latency = round(bot.latency * 1000)
+    await ctx.send(f"🏓 Pong! Latency: `{latency}ms`")
+
+
+@bot.tree.command(name="whitelist_add", description="Staff: Manually whitelist a player")
+async def cmd_slash_whitelist_add(interaction: discord.Interaction, member: discord.Member, ign: str):
+    is_staff = any(r.name in ["👑 Server Admin / OP", "🛡️ Moderator", "⚙️ SysAdmin / Host"] for r in interaction.user.roles)
+    if not (is_staff or interaction.user.guild_permissions.administrator):
+        await interaction.response.send_message("⛔ Only staff can use this command.", ephemeral=True)
+        return
+
+    wl_role = discord.utils.get(interaction.guild.roles, name="⛏️ SMP Whitelisted")
+    verified_role = discord.utils.get(interaction.guild.roles, name="🎓 Verified IITKian")
+    if wl_role:
+        await member.add_roles(wl_role)
+    if verified_role:
+        await member.add_roles(verified_role)
+
+    try:
+        await member.send(f"🎉 You have been whitelisted on IITK Minecraft as **`{ign}`**! Check `#server-ip-and-guide` for IP.")
+    except Exception:
+        pass
+
+    await interaction.response.send_message(f"✅ Whitelisted {member.mention} as **`{ign}`**.")
+
+
+# ==============================================================================
 # DISCORD EVENTS & ARCHITECT ROUTINES
 # ==============================================================================
 
@@ -387,6 +557,12 @@ async def on_ready():
     bot.add_view(RolesView())
     bot.add_view(WhitelistLandingView())
     bot.add_view(TicketLauncher())
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"⚡ Synced {len(synced)} slash command(s) successfully!", flush=True)
+    except Exception as e:
+        print(f"Slash command sync error: {e}", flush=True)
 
     for guild in bot.guilds:
         await setup_iitk_server(guild)
