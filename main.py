@@ -9,6 +9,9 @@ import os
 import ssl
 import certifi
 import asyncio
+import json
+import io
+import re
 from typing import Optional
 from aiohttp import web
 
@@ -25,6 +28,76 @@ bot = commands.Bot(command_prefix="!iitk", intents=intents, help_command=None)
 TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip() or (sys.argv[1].strip() if len(sys.argv) > 1 else "")
 SERVER_IP = os.environ.get("MINECRAFT_SERVER_IP", "").strip() or (sys.argv[2].strip() if len(sys.argv) > 2 else "")
 PORT = int(os.environ.get("PORT", 10000))
+
+# --- Persistent Whitelist Database Helpers ---
+WHITELIST_DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whitelist_registry.json")
+
+def load_whitelist_db():
+    if os.path.exists(WHITELIST_DB_FILE):
+        try:
+            with open(WHITELIST_DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_whitelist_entry(ign: str, discord_id: int, roll_no: str = "", hostel: str = "", edition: str = ""):
+    db = load_whitelist_db()
+    db[ign.strip()] = {
+        "ign": ign.strip(),
+        "discord_id": discord_id,
+        "roll_no": roll_no,
+        "hostel": hostel,
+        "edition": edition,
+        "whitelisted_at": discord.utils.utcnow().isoformat()
+    }
+    try:
+        with open(WHITELIST_DB_FILE, "w") as f:
+            json.dump(db, f, indent=2)
+    except Exception as e:
+        print(f"Error saving whitelist db: {e}")
+
+async def sync_whitelist_from_channel(guild: discord.Guild):
+    db = load_whitelist_db()
+    review_channel = discord.utils.get(guild.text_channels, name="📋・whitelist-review")
+    if review_channel:
+        try:
+            async for msg in review_channel.history(limit=200):
+                if msg.embeds:
+                    emb = msg.embeds[0]
+                    if "Approved" in (emb.title or ""):
+                        ign = ""
+                        discord_id = 0
+                        roll_no = ""
+                        edition = ""
+                        hostel = ""
+                        for f in emb.fields:
+                            if "Minecraft IGN" in f.name:
+                                ign = f.value.replace("`", "").strip()
+                            elif "Discord User" in f.name:
+                                m = re.search(r'`(\d+)`', f.value)
+                                if m:
+                                    discord_id = int(m.group(1))
+                            elif "Roll Number" in f.name:
+                                roll_no = f.value.replace("`", "").strip()
+                            elif "Edition" in f.name:
+                                edition = f.value.replace("`", "").strip()
+                            elif "Hostel" in f.name:
+                                hostel = f.value.replace("`", "").strip()
+                        if ign and ign not in db:
+                            db[ign] = {
+                                "ign": ign,
+                                "discord_id": discord_id,
+                                "roll_no": roll_no,
+                                "edition": edition,
+                                "hostel": hostel,
+                                "whitelisted_at": msg.created_at.isoformat()
+                            }
+            with open(WHITELIST_DB_FILE, "w") as f:
+                json.dump(db, f, indent=2)
+        except Exception as e:
+            print(f"Error syncing history: {e}")
+    return db
 
 # --- Role Hierarchy Specification ---
 ROLES_SPEC = [
@@ -302,6 +375,20 @@ class WhitelistApprovalView(discord.ui.View):
             except Exception:
                 pass
 
+        # Save to persistent whitelist database
+        roll_no = ""
+        edition = ""
+        hostel = ""
+        if interaction.message and interaction.message.embeds:
+            for f in interaction.message.embeds[0].fields:
+                if "Roll Number" in f.name:
+                    roll_no = f.value.replace("`", "").strip()
+                elif "Edition" in f.name:
+                    edition = f.value.replace("`", "").strip()
+                elif "Hostel" in f.name:
+                    hostel = f.value.replace("`", "").strip()
+        save_whitelist_entry(ign=ign, discord_id=applicant_id or 0, roll_no=roll_no, hostel=hostel, edition=edition)
+
         for item in self.children:
             item.disabled = True
 
@@ -417,13 +504,17 @@ async def cmd_slash_help(interaction: discord.Interaction):
             "• `/coords` or `!iitk coords` — View community coordinates (Spawn, Nether Hub, End Portal).\n"
             "• `/rules` or `!iitk rules` — Quick recap of server guidelines & anti-grief policy.\n"
             "• `/ping` or `!iitk ping` — Check bot response latency.\n"
+            "• `/whitelist_list` or `!iitk whitelist_list` — View all whitelisted players.\n"
             "• `/help` or `!iitk help` — Show this help manual."
         ),
         inline=False
     )
     embed.add_field(
         name="🛡️ Staff Commands",
-        value="• `/whitelist_add <user> <ign>` — Instantly approve & whitelist a member (Staff only).",
+        value=(
+            "• `/whitelist_add <user> <ign>` — Instantly approve & whitelist a member.\n"
+            "• `/whitelist_export` or `!iitk export_whitelist` — Export batch commands & `whitelist.json` file for Minecraft server."
+        ),
         inline=False
     )
     await interaction.response.send_message(embed=embed)
@@ -557,7 +648,123 @@ async def cmd_slash_whitelist_add(interaction: discord.Interaction, member: disc
     except Exception:
         pass
 
+    save_whitelist_entry(ign=ign, discord_id=member.id)
     await interaction.response.send_message(f"✅ Whitelisted {member.mention} as **`{ign}`**.")
+
+
+@bot.tree.command(name="whitelist_export", description="Staff: Export all whitelisted players for Minecraft server")
+async def cmd_slash_whitelist_export(interaction: discord.Interaction):
+    is_staff = any(r.name in ["👑 Server Admin / OP", "🛡️ Moderator", "⚙️ SysAdmin / Host"] for r in interaction.user.roles)
+    if not (is_staff or interaction.user.guild_permissions.administrator):
+        await interaction.response.send_message("⛔ Only staff can use this command.", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    db = await sync_whitelist_from_channel(interaction.guild)
+
+    if not db:
+        await interaction.followup.send("⚠️ No whitelisted players recorded yet.", ephemeral=True)
+        return
+
+    total = len(db)
+    commands_list = [f"/whitelist add {ign}" for ign in db.keys()]
+    commands_text = "\n".join(commands_list)
+
+    cmd_file = discord.File(io.BytesIO(commands_text.encode('utf-8')), filename="whitelist_commands.txt")
+    mc_json_data = [{"uuid": "00000000-0000-0000-0000-000000000000", "name": ign} for ign in db.keys()]
+    json_file = discord.File(io.BytesIO(json.dumps(mc_json_data, indent=2).encode('utf-8')), filename="whitelist.json")
+
+    preview_cmds = "\n".join(commands_list[:15])
+    if len(commands_list) > 15:
+        preview_cmds += f"\n... and {len(commands_list) - 15} more (see attached file)"
+
+    embed = discord.Embed(
+        title=f"📋 Whitelist Export ({total} Total Players)",
+        description=(
+            f"Here are the server console commands for all **{total}** whitelisted players:\n\n"
+            f"```text\n{preview_cmds}\n```\n"
+            "**Attached Files:**\n"
+            "• `whitelist_commands.txt` — Copy and paste directly into your server console.\n"
+            "• `whitelist.json` — Drop directly into your Minecraft server directory."
+        ),
+        color=discord.Color.from_rgb(46, 204, 113)
+    )
+    await interaction.followup.send(embed=embed, files=[cmd_file, json_file], ephemeral=True)
+
+
+@bot.command(name="whitelist_export", aliases=["export_whitelist"])
+async def cmd_text_whitelist_export(ctx):
+    is_staff = any(r.name in ["👑 Server Admin / OP", "🛡️ Moderator", "⚙️ SysAdmin / Host"] for r in ctx.author.roles)
+    if not (is_staff or ctx.author.guild_permissions.administrator):
+        await ctx.send("⛔ Only staff can use this command.")
+        return
+
+    db = await sync_whitelist_from_channel(ctx.guild)
+    if not db:
+        await ctx.send("⚠️ No whitelisted players recorded yet.")
+        return
+
+    total = len(db)
+    commands_list = [f"/whitelist add {ign}" for ign in db.keys()]
+    commands_text = "\n".join(commands_list)
+    cmd_file = discord.File(io.BytesIO(commands_text.encode('utf-8')), filename="whitelist_commands.txt")
+
+    preview_cmds = "\n".join(commands_list[:15])
+    if len(commands_list) > 15:
+        preview_cmds += f"\n... and {len(commands_list) - 15} more"
+
+    embed = discord.Embed(
+        title=f"📋 Whitelist Export ({total} Total Players)",
+        description=f"```text\n{preview_cmds}\n```",
+        color=discord.Color.from_rgb(46, 204, 113)
+    )
+    await ctx.send(embed=embed, file=cmd_file)
+
+
+@bot.tree.command(name="whitelist_list", description="List all currently whitelisted Minecraft IGNs")
+async def cmd_slash_whitelist_list(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=False)
+    db = await sync_whitelist_from_channel(interaction.guild)
+
+    if not db:
+        await interaction.followup.send("⚠️ No whitelisted players found.")
+        return
+
+    items = []
+    for ign, data in db.items():
+        roll = f" ({data.get('roll_no')})" if data.get('roll_no') else ""
+        items.append(f"• **`{ign}`**{roll}")
+
+    preview = "\n".join(items[:30])
+    if len(items) > 30:
+        preview += f"\n*...and {len(items) - 30} more*"
+
+    embed = discord.Embed(
+        title=f"⛏️ Whitelisted Crafters ({len(db)} Total)",
+        description=preview,
+        color=discord.Color.from_rgb(26, 188, 156)
+    )
+    await interaction.followup.send(embed=embed)
+
+
+@bot.command(name="whitelist_list")
+async def cmd_text_whitelist_list(ctx):
+    db = await sync_whitelist_from_channel(ctx.guild)
+    if not db:
+        await ctx.send("⚠️ No whitelisted players found.")
+        return
+
+    items = [f"• **`{ign}`**" for ign in db.keys()]
+    preview = "\n".join(items[:30])
+    if len(items) > 30:
+        preview += f"\n*...and {len(items) - 30} more*"
+
+    embed = discord.Embed(
+        title=f"⛏️ Whitelisted Crafters ({len(db)} Total)",
+        description=preview,
+        color=discord.Color.from_rgb(26, 188, 156)
+    )
+    await ctx.send(embed=embed)
 
 
 # ==============================================================================
