@@ -256,10 +256,25 @@ class WhitelistModal(discord.ui.Modal, title="⛏️ IITK Minecraft Whitelist Fo
 
 
 class WhitelistApprovalView(discord.ui.View):
-    def __init__(self, applicant_id: int, ign: str):
+    def __init__(self, applicant_id: Optional[int] = None, ign: Optional[str] = None):
         super().__init__(timeout=None)
         self.applicant_id = applicant_id
         self.ign = ign
+
+    def _extract_details(self, message):
+        import re
+        applicant_id = self.applicant_id
+        ign = self.ign
+        if message and message.embeds:
+            embed = message.embeds[0]
+            for field in embed.fields:
+                if "Discord User" in field.name and not applicant_id:
+                    match = re.search(r'`(\d+)`', field.value)
+                    if match:
+                        applicant_id = int(match.group(1))
+                elif "Minecraft IGN" in field.name and not ign:
+                    ign = field.value.replace("`", "").strip()
+        return applicant_id, ign or "Player"
 
     @discord.ui.button(label="Approve & Whitelist", style=discord.ButtonStyle.success, emoji="✅", custom_id="wl_approve")
     async def approve_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -269,7 +284,8 @@ class WhitelistApprovalView(discord.ui.View):
             await interaction.response.send_message("⛔ Only staff can approve whitelist requests.", ephemeral=True)
             return
 
-        member = guild.get_member(self.applicant_id)
+        applicant_id, ign = self._extract_details(interaction.message)
+        member = guild.get_member(applicant_id) if applicant_id else None
         if member:
             wl_role = discord.utils.get(guild.roles, name="⛏️ SMP Whitelisted")
             verified_role = discord.utils.get(guild.roles, name="🎓 Verified IITKian")
@@ -281,7 +297,7 @@ class WhitelistApprovalView(discord.ui.View):
             try:
                 await member.send(
                     f"🎉 **You have been whitelisted on IITK Minecraft!**\n"
-                    f"Your IGN **`{self.ign}`** is approved. Check `#server-ip-and-guide` for connection details!"
+                    f"Your IGN **`{ign}`** is approved. Check `#server-ip-and-guide` for connection details!"
                 )
             except Exception:
                 pass
@@ -293,7 +309,7 @@ class WhitelistApprovalView(discord.ui.View):
         embed.color = discord.Color.green()
         embed.title = f"✅ Whitelist Approved by {interaction.user.display_name}"
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message(f"Whitelisted `{self.ign}` and assigned roles.", ephemeral=True)
+        await interaction.response.send_message(f"Whitelisted `{ign}` and assigned roles.", ephemeral=True)
 
     @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger, emoji="❌", custom_id="wl_reject")
     async def reject_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -302,6 +318,7 @@ class WhitelistApprovalView(discord.ui.View):
             await interaction.response.send_message("⛔ Only staff can reject requests.", ephemeral=True)
             return
 
+        applicant_id, ign = self._extract_details(interaction.message)
         for item in self.children:
             item.disabled = True
 
@@ -309,7 +326,7 @@ class WhitelistApprovalView(discord.ui.View):
         embed.color = discord.Color.red()
         embed.title = f"❌ Whitelist Denied by {interaction.user.display_name}"
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message(f"Rejected request for `{self.ign}`.", ephemeral=True)
+        await interaction.response.send_message(f"Rejected request for `{ign}`.", ephemeral=True)
 
 
 class WhitelistLandingView(discord.ui.View):
@@ -556,6 +573,7 @@ async def on_ready():
 
     bot.add_view(RolesView())
     bot.add_view(WhitelistLandingView())
+    bot.add_view(WhitelistApprovalView())
     bot.add_view(TicketLauncher())
 
     try:
