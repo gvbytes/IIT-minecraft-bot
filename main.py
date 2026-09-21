@@ -606,7 +606,14 @@ async def cmd_text_coords(ctx):
 async def cmd_slash_rules(interaction: discord.Interaction):
     embed = discord.Embed(
         title="📜 Server Rules & Guidelines Summary",
-        description="1. **No Griefing / Stealing:** CoreProtect is active and logs all block & chest edits.\n2. **No Unfair Advantages:** No X-Ray, baritone, or hacked clients.\n3. **Campus Honor Code:** Respect fellow students in chat and voice.\n4. **Farms:** Keep farms lag-friendly with an off-switch.\n\nFull details in <#rules-and-conduct>.",
+        description=(
+            "1. **No Griefing / Stealing:** CoreProtect is active and logs all block & chest edits.\n"
+            "2. **No Unfair Advantages:** No X-Ray, baritone, or hacked clients.\n"
+            "3. **Fair Combat & No Combat Logging:** Disconnecting during PvP to save gear is banned.\n"
+            "4. **Campus Honor Code:** Respect fellow students in chat and voice.\n"
+            "5. **Farms:** Keep farms lag-friendly with an accessible off-switch.\n\n"
+            "Full details in <#rules-and-conduct>."
+        ),
         color=discord.Color.from_rgb(33, 150, 243)
     )
     await interaction.response.send_message(embed=embed)
@@ -966,8 +973,26 @@ async def deploy_master_panels(guild: discord.Guild):
                 ),
                 inline=False
             )
+            embed.add_field(
+                name="6️⃣ PvP Protocols & No Combat Logging",
+                value=(
+                    "• **No Combat Logging:** Disconnecting or quitting during an active PvP fight to avoid death or inventory loss is strictly forbidden.\n"
+                    "• **Mutual Consent PvP:** Random spawn-killing or attacking peaceful builders without mutual consent is prohibited.\n"
+                    "• **No Portal Trapping / Camping:** Trapping Nether portals or killing players while loading chunks is not allowed.\n"
+                    "• **Explosives:** Anchor and End Crystal combat is strictly banned near bases, spawn, or public infrastructure."
+                ),
+                inline=False
+            )
             embed.set_footer(text="IITK Minecraft Network • Maintained by students for students • Play Fair & Have Fun")
-            await rules_channel.send(embed=embed)
+            
+            found = False
+            for msg in history:
+                if msg.author == guild.me and msg.embeds:
+                    await msg.edit(embed=embed)
+                    found = True
+                    break
+            if not found:
+                await rules_channel.send(embed=embed)
 
     # Server IP Guide
     guide_channel = discord.utils.get(guild.text_channels, name="🌐・server-ip-and-guide")
