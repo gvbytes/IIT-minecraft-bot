@@ -20,7 +20,7 @@ import discord
 from discord.ext import commands
 
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!iitk", intents=intents)
+bot = commands.Bot(command_prefix="!iitk", intents=intents, help_command=None)
 
 TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip() or (sys.argv[1].strip() if len(sys.argv) > 1 else "")
 SERVER_IP = os.environ.get("MINECRAFT_SERVER_IP", "").strip() or (sys.argv[2].strip() if len(sys.argv) > 2 else "")
