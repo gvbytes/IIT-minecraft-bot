@@ -305,6 +305,50 @@ class WhitelistModal(discord.ui.Modal, title="⛏️ IITK Minecraft Whitelist Fo
         if not review_channel:
             review_channel = discord.utils.get(guild.text_channels, name="📋・whitelist-requests")
 
+        clean_ign = self.ign.value.strip()
+        clean_roll = self.roll_no.value.strip()
+
+        # 1. Prevent duplicate IGN or Roll Number from existing database
+        db = load_whitelist_db()
+        for existing_ign, data in db.items():
+            if existing_ign.lower() == clean_ign.lower():
+                await interaction.response.send_message(
+                    f"⚠️ The Minecraft IGN **`{clean_ign}`** is already registered on the server!\n"
+                    "If this is your account, please open a ticket in <#create-a-ticket>.",
+                    ephemeral=True
+                )
+                return
+            if clean_roll and data.get("roll_no") == clean_roll and data.get("discord_id") != interaction.user.id:
+                await interaction.response.send_message(
+                    f"⚠️ The Roll Number **`{clean_roll}`** is already registered to another user!\n"
+                    "If this is an error, please open a ticket in <#create-a-ticket>.",
+                    ephemeral=True
+                )
+                return
+
+        # 2. Check if an application is already pending in review channel
+        if review_channel:
+            try:
+                async for msg in review_channel.history(limit=50):
+                    if msg.embeds:
+                        emb = msg.embeds[0]
+                        if "New Whitelist Application" in (emb.title or ""):
+                            for f in emb.fields:
+                                if "Discord User" in f.name and str(interaction.user.id) in f.value:
+                                    await interaction.response.send_message(
+                                        "⏳ **You already have an application waiting for staff review!** Please be patient.",
+                                        ephemeral=True
+                                    )
+                                    return
+                                elif "Minecraft IGN" in f.name and f.value.replace("`", "").strip().lower() == clean_ign.lower():
+                                    await interaction.response.send_message(
+                                        f"⏳ An application for **`{clean_ign}`** is already pending review!",
+                                        ephemeral=True
+                                    )
+                                    return
+            except Exception:
+                pass
+
         embed = discord.Embed(
             title="📥 New Whitelist Application Received",
             color=discord.Color.from_rgb(26, 188, 156),
@@ -312,18 +356,18 @@ class WhitelistModal(discord.ui.Modal, title="⛏️ IITK Minecraft Whitelist Fo
         )
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
         embed.add_field(name="👤 Discord User", value=f"{interaction.user.mention} (`{interaction.user.id}`)", inline=False)
-        embed.add_field(name="⛏️ Minecraft IGN", value=f"`{self.ign.value.strip()}`", inline=True)
+        embed.add_field(name="⛏️ Minecraft IGN", value=f"`{clean_ign}`", inline=True)
         embed.add_field(name="🎮 Edition", value=f"`{self.edition.value.strip().capitalize()}`", inline=True)
-        embed.add_field(name="🎓 Roll Number", value=f"`{self.roll_no.value.strip()}`", inline=True)
+        embed.add_field(name="🎓 Roll Number", value=f"`{clean_roll}`", inline=True)
         embed.add_field(name="🏰 Hostel / Hall", value=f"`{self.hostel.value.strip() or 'N/A'}`", inline=True)
         embed.set_footer(text="Staff: Click below to approve or deny this request.")
 
-        view = WhitelistApprovalView(applicant_id=interaction.user.id, ign=self.ign.value.strip())
+        view = WhitelistApprovalView(applicant_id=interaction.user.id, ign=clean_ign)
         if review_channel:
             await review_channel.send(embed=embed, view=view)
 
         await interaction.response.send_message(
-            f"✅ **Application submitted!** Staff will review your whitelist request for **`{self.ign.value.strip()}`** shortly.",
+            f"✅ **Application submitted!** Staff will review your whitelist request for **`{clean_ign}`** shortly.",
             ephemeral=True
         )
 
@@ -422,6 +466,49 @@ class WhitelistLandingView(discord.ui.View):
 
     @discord.ui.button(label="Apply for Whitelist", style=discord.ButtonStyle.success, emoji="📝", custom_id="open_wl_modal")
     async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        member = interaction.user
+
+        # 1. Check if user already has the whitelisted role
+        wl_role = discord.utils.get(guild.roles, name="⛏️ SMP Whitelisted")
+        if wl_role and wl_role in member.roles:
+            await interaction.response.send_message(
+                "✅ **You are already whitelisted on the server!**\n"
+                "Check <#server-ip-and-guide> for the connection address.",
+                ephemeral=True
+            )
+            return
+
+        # 2. Check if user is already recorded in the database
+        db = load_whitelist_db()
+        for ign, data in db.items():
+            if data.get("discord_id") == member.id:
+                await interaction.response.send_message(
+                    f"✅ **You are already whitelisted as `{ign}`!**\n"
+                    "If you need to change your Minecraft username, please open a ticket in <#create-a-ticket>.",
+                    ephemeral=True
+                )
+                return
+
+        # 3. Check if user already has an active pending request in review channel
+        review_channel = discord.utils.get(guild.text_channels, name="📋・whitelist-review")
+        if review_channel:
+            try:
+                async for msg in review_channel.history(limit=50):
+                    if msg.embeds:
+                        emb = msg.embeds[0]
+                        if "New Whitelist Application" in (emb.title or ""):
+                            for f in emb.fields:
+                                if "Discord User" in f.name and str(member.id) in f.value:
+                                    await interaction.response.send_message(
+                                        "⏳ **You already have an application waiting for staff review!**\n"
+                                        "Please wait for a moderator to approve it before submitting again.",
+                                        ephemeral=True
+                                    )
+                                    return
+            except Exception:
+                pass
+
         await interaction.response.send_modal(WhitelistModal())
 
 
