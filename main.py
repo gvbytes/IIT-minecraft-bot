@@ -783,11 +783,13 @@ async def on_ready():
     bot.add_view(WhitelistApprovalView())
     bot.add_view(TicketLauncher())
 
-    try:
-        synced = await bot.tree.sync()
-        print(f"⚡ Synced {len(synced)} slash command(s) successfully!", flush=True)
-    except Exception as e:
-        print(f"Slash command sync error: {e}", flush=True)
+    for guild in bot.guilds:
+        try:
+            bot.tree.copy_global_to(guild=guild)
+            synced = await bot.tree.sync(guild=guild)
+            print(f"⚡ Instantly synced {len(synced)} slash command(s) to guild: {guild.name}", flush=True)
+        except Exception as e:
+            print(f"Slash command sync error on {guild.name}: {e}", flush=True)
 
     for guild in bot.guilds:
         await setup_iitk_server(guild)
