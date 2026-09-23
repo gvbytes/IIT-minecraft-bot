@@ -14,6 +14,11 @@ import io
 import re
 from typing import Optional
 from aiohttp import web
+from dotenv import load_dotenv
+
+# Load settings from a local .env file if one exists (see .env.example).
+# On a host like Render, real environment variables are used instead.
+load_dotenv()
 
 # Fix macOS SSL Certificates
 os.environ["SSL_CERT_FILE"] = certifi.where()

@@ -19,13 +19,22 @@ Master bot and automation engine for the **IIT Kanpur Minecraft Community & SMP 
 
 ```bash
 # Clone the repository
-git clone https://github.com/gvbytes/IIT-minecraft-bot.git
-cd IIT-minecraft-bot
+git clone https://github.com/gvbytes/IITK-minecraft-bot.git
+cd IITK-minecraft-bot
 
 # Install dependencies
 pip install -r requirements.txt
 
+# Create your settings file, then put your bot token in it
+cp .env.example .env
+
 # Run the bot
-export DISCORD_BOT_TOKEN="your_bot_token_here"
 python main.py
 ```
+
+Settings (in `.env` locally, or as environment variables on your host):
+- `DISCORD_BOT_TOKEN` (required): your bot token from the Discord Developer Portal
+- `MINECRAFT_SERVER_IP` (optional): shown by the `/ip` command
+- `PORT` (optional, default `10000`): port for the keep-alive web server
+
+`.env` is listed in `.gitignore`, so your token is never committed.
