@@ -25,8 +25,9 @@ from discord.ext import commands
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!iitk", intents=intents, help_command=None)
 
-TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip() or (sys.argv[1].strip() if len(sys.argv) > 1 else "")
-SERVER_IP = os.environ.get("MINECRAFT_SERVER_IP", "").strip() or (sys.argv[2].strip() if len(sys.argv) > 2 else "")
+# Read settings only from the environment, never from the command line
+TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+SERVER_IP = os.environ.get("MINECRAFT_SERVER_IP", "").strip()
 PORT = int(os.environ.get("PORT", 10000))
 
 # --- Persistent Whitelist Database Helpers ---
@@ -1197,7 +1198,7 @@ async def start_web_server():
 
 async def main():
     if not TOKEN:
-        print("ERROR: DISCORD_BOT_TOKEN environment variable or command-line argument is missing!")
+        print("ERROR: DISCORD_BOT_TOKEN environment variable is missing!")
         sys.exit(1)
 
     # Run the keep-alive web server and the Discord bot together
